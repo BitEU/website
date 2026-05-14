@@ -26,11 +26,13 @@ I would also appreciate any assistance with analyzing QNX systems, as all of my 
   * [Decoder Specifications](#decoder-specifications)  
     * [OnStar Decoder](#onstar-decoder)  
     * [Toyota Decoder](#toyota-decoder)  
-    * [Honda Decoder](#honda-decoder)    * [Mercedes-Benz Decoder](#mercedes-benz-decoder)
+    * [Honda Decoder](#honda-decoder)
+    * [Honda TLHOBINN0D1 Decoder](#honda-tlhobinn0d1-decoder)
+    * [Mercedes-Benz Decoder](#mercedes-benz-decoder)
     * [BMW NBT-HDD Decoder](#bmw-nbt-hdd-decoder)
     * [Stellantis Decoder](#stellantis-decoder)
     * [Denso Decoder](#denso-decoder)
-    * [BMW NBT-HDD Decoder](#bmw-nbt-hdd-decoder)
+    * [Kia Dealer Mode Decoder](#kia-dealer-mode-decoder)
   * [Installation from Source](#installation-from-source)  
     * [Windows](#windows)  
     * [Linux/macOS](#linuxmacos)  
@@ -79,10 +81,12 @@ python main.py --cli
 * **OnStar Gen 10+** \- Extracts GPS data from OnStar NAND dumps (.CE0 files)  
 * **Toyota TL19** \- Extracts GPS data from Toyota infotainment systems (.CE0 files)  
 * **Honda Telematics** \- Extracts GPS data from Honda Android eMMC images (.USER files)
+* **Honda TLHOBINN0D1** \- Extracts GPS data from Honda telematics binary files (.CE0, .bin, .001 files)
 * **Mercedes-Benz** \- Extracts GPS data from Mercedes-Benz database files (.db files)
 * **BMW NBT-HDD** \- Extracts GPS data from BMW NBT-HDD folder structure (folder)
 * **Stellantis** \- Extracts GPS data from a folder holding Stellantis log files (folder)
-* **Denso** \- Extracts GPS, speed, and bluetooth data from Denso and Acura Android eMMC images (.001 files)
+* **Denso DNNS087** \- Extracts GPS, speed, and bluetooth data from Denso and Acura Android eMMC images (.001 files)
+* **Kia Dealer Mode** \- Extracts GPS data from Kia head unit dealer-mode log bundles (.tar.gz files)
 
 ### **Features**
 
@@ -127,7 +131,8 @@ FENDER/
 │   ├── mercedes_decoder.py  
 │   ├── bmw_decoder.py
 │   ├── denso_decoder.py    
-│   └── stellantis_decoder.py  
+│   ├── stellantis_decoder.py  
+│   └── kia_decoder.py
 └── requirements.txt
 ```
 
@@ -385,6 +390,90 @@ NBT-HDD/
 └── [other system folders]
 ```
 
+#### **Honda TLHOBINN0D1 Decoder**
+
+File Format: Honda telematics binary files (.CE0, .bin, .001 files)  
+Data Location: Text-formatted GPS records embedded in binary files  
+Extraction Method: Pattern matching for TIMESTAMP markers with field extraction  
+Key patterns:
+
+- `TIMESTAMP:` - Unix epoch timestamp in milliseconds  
+- `LATITUDE:` - GPS latitude in decimal degrees  
+- `LONG*` - GPS longitude in decimal degrees (with special character handling)  
+- `ALTITUDE:` - Altitude data  
+- `SPEED:` - Speed in meters per second  
+- `BEARING:` - Heading/bearing information  
+
+**Extraction Process**:
+
+1. Scan binary file for TIMESTAMP markers using regex pattern matching  
+2. Extract text blocks between consecutive TIMESTAMP markers  
+3. Parse GPS data fields using flexible regex patterns  
+4. Handle special characters in field names (e.g., `LONG¬` instead of `LONGITUDE`)  
+5. Validate coordinates and filter invalid entries (null island, out of range)  
+6. Convert Unix epoch milliseconds to UTC timestamps  
+
+**Data Fields Extracted**:
+
+- **Basic GPS**: Latitude, longitude, altitude, accuracy  
+- **Motion**: Speed, bearing  
+- **Quality**: Fix type, HDOP, VDOP, PDOP, number of satellites  
+- **GNSS Systems**: GPS_SVC, GLONASS, GALILEO constellation indicators  
+- **Time Components**: Year, month, day, hour, minute, GPS week, GPS TOW  
+- **Metadata**: Source identifier, geodetic system, hex offset location  
+
+**Record Format**:
+
+- Records begin with `TIMESTAMP:` followed by Unix epoch in milliseconds  
+- Each field follows the pattern `FIELD_NAME:VALUE`  
+- Special characters may appear in field names due to binary corruption  
+- Multiple regex patterns used to handle field name variations  
+- Records are variable length, separated by next TIMESTAMP marker  
+
+**Output Structure**:
+
+The decoder provides comprehensive GPS telemetry with 26 columns including:
+- Hex offset for binary file reference  
+- Unix epoch and formatted UTC timestamp  
+- Full GPS coordinates and motion data  
+- Signal quality and satellite constellation information  
+- Alternative timestamp components for verification  
+
+#### **Kia Dealer Mode Decoder**
+
+File Format: Kia head unit dealer-mode log bundles (.tar.gz files)  
+Data Location: AUTOSAR DLT binaries and plain-text service dumps inside the tarball  
+Extraction Method: Streaming tarball read with chunked binary regex scanning (no on-disk extraction)  
+Process:
+
+1. Open the .tar.gz with Python's `tarfile` module in streaming mode  
+2. Route each member by path: `customlog/servicedump-*.log` and `dltlog/log_*.dlt`  
+3. For DLT logs, slide a chunked buffer with overlap to find ASCII GPS payloads embedded in DLT verbose-mode messages  
+4. For each match, walk backwards to the nearest DLT storage header (`DLT\x01` magic) to recover a per-message UTC timestamp  
+5. Validate coordinates and reject the half-zero "no fix" sentinel Kia emits during cold start  
+
+**Key Patterns**:
+
+- `LocationService: gps <lon>, <lat>, <alt>, <speed>, <heading>, ...` - Primary GNSS fix stream from the Trimble receiver  
+- `onLocationMapMatchingInfoChanged: lon=, lat=, alt=, handing=` - Map-matched position output  
+- `CompassWidget ... lati:<int>, longi:<int>` - Integer fixed-point fixes (1e-6 degrees)  
+- `longitude :`, `laptitude :`, `altitude :`, `time :` - LocationService snapshot inside servicedump  
+
+**Timestamp Recovery**:
+
+- Per-fix UTC timestamps are decoded from the 16-byte DLT storage header preceding each match (4-byte magic + LE uint32 seconds + LE uint32 microseconds + 4-byte ECU id)  
+- Pre-2000 epochs are rejected to filter out RTC-not-yet-synced boots  
+- Falls back to the filename's embedded `YYYYMMDD-HHMMSS` if no header is in range  
+
+**Output Structure**:
+
+The decoder produces 13 columns including:
+- Latitude, longitude, and UTC timestamp  
+- Source tag (`DLT.LocationService`, `DLT.MapMatching`, `DLT.CompassWidget`, `ServiceDump.LocationService`)  
+- Altitude, speed, heading, satellite count, HDOP, PDOP  
+- Timestamp source (DLT storage header / DLT filename / log line) for provenance  
+- Member path and member offset (hex) inside the tarball for forensic citation  
+
 ### **Installation from Source**
 
 #### **Windows**
@@ -547,6 +636,8 @@ Vehicles with partial (parse from file/folder, not disk image) support:
   * Ram
   * Jeep
   * Fiat
+* Hyundai Group
+  * Kia (dealer-mode USB log bundle only)
 
 <br>
 
@@ -557,7 +648,6 @@ Currently unsupported:
   * Infiniti
 * Hyundai Group
   * Hyundai
-  * Kia
 * Ford Motor Company
   * Ford
   * Lincoln
