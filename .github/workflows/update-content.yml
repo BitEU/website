@@ -1,0 +1,136 @@
+name: Update content from source repos
+
+on:
+  workflow_dispatch:
+    inputs:
+      repo:
+        description: 'Specific repo to update (leave empty to update all)'
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout website repo
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          owner: WCDAHT
+
+      - name: Determine which repos to update
+        id: repos
+        env:
+          MANUAL_REPO: ${{ github.event.inputs.repo }}
+          REPOS_VAR: ${{ vars.REPOS_LIST }}
+        run: |
+          if [ -n "$MANUAL_REPO" ]; then
+            echo "repos=$MANUAL_REPO" >> $GITHUB_OUTPUT
+          elif [ -n "$REPOS_VAR" ]; then
+            echo "repos=$REPOS_VAR" >> $GITHUB_OUTPUT
+          else
+            # Fallback default if the variable is empty
+            echo "repos=repo-one repo-two" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Fetch releases and READMEs
+        env:
+          TOKEN: ${{ steps.app-token.outputs.token }}
+          ORG: WCDAHT
+        run: |
+          # Start building manifest entries
+          # We'll collect per-repo JSON and assemble at the end
+          mkdir -p tmp_manifest
+
+          for REPO in ${{ steps.repos.outputs.repos }}; do
+            echo "Processing $REPO..."
+            mkdir -p "content/$REPO"
+
+            # --- Fetch latest release ---
+            RELEASE=$(curl -s \
+              -H "Authorization: Bearer $TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/$ORG/$REPO/releases/latest")
+
+            # Parse fields
+            TAG=$(echo "$RELEASE" | jq -r '.tag_name')               # e.g. v.1.2.3
+            VERSION=$(echo "$TAG" | sed 's/^v\.//')                   # strip leading "v." -> 1.2.3
+            RELEASED_AT=$(echo "$RELEASE" | jq -r '.published_at' | cut -c1-10)  # YYYY-MM-DD
+            ASSET_URL=$(echo "$RELEASE" | jq -r '.assets[0].url')
+            ASSET_NAME=$(echo "$RELEASE" | jq -r '.assets[0].name')
+
+            if [ -z "$VERSION" ] || [ "$VERSION" = "null" ]; then
+              echo "No release found for $REPO, skipping."
+              continue
+            fi
+
+            # --- Download release asset -> saved as literally "release" (LFS-tracked) ---
+            echo "Downloading release asset: $ASSET_NAME"
+            curl -sL \
+              -H "Authorization: Bearer $TOKEN" \
+              -H "Accept: application/octet-stream" \
+              -o "content/$REPO/release" \
+              "$ASSET_URL"
+
+            # --- Download README ---
+            echo "Downloading README for $REPO"
+            curl -sL \
+              -H "Authorization: Bearer $TOKEN" \
+              -H "Accept: application/vnd.github.raw+json" \
+              "https://api.github.com/repos/$ORG/$REPO/contents/README.md" \
+              -o "content/$REPO/README.md"
+
+            # --- Write per-repo manifest fragment ---
+            cat > "tmp_manifest/$REPO.json" <<EOF
+          {
+            "version": "$VERSION",
+            "released_at": "$RELEASED_AT",
+            "original_filename": "$ASSET_NAME",
+            "release_file": "content/$REPO/release",
+            "readme_file": "content/$REPO/README.md"
+          }
+          EOF
+
+            echo "Done: $REPO @ v$VERSION"
+          done
+
+      - name: Assemble manifest.json
+        run: |
+          # If this is a partial update (single repo), merge into existing manifest
+          if [ -f manifest.json ]; then
+            EXISTING=$(cat manifest.json)
+          else
+            EXISTING="{}"
+          fi
+
+          UPDATED="$EXISTING"
+          for FRAGMENT in tmp_manifest/*.json; do
+            REPO=$(basename "$FRAGMENT" .json)
+            ENTRY=$(cat "$FRAGMENT")
+            UPDATED=$(echo "$UPDATED" | jq --arg repo "$REPO" --argjson entry "$ENTRY" \
+              '. + {($repo): $entry}')
+          done
+
+          echo "$UPDATED" | jq '.' > manifest.json
+          echo "manifest.json updated."
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add content/ manifest.json
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: update content from source repos [skip ci]"
+            git push
+          else
+            echo "No changes detected."
+          fi
