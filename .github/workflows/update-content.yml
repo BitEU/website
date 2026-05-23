@@ -53,7 +53,6 @@ jobs:
 
           for REPO in ${{ steps.repos.outputs.repos }}; do
             echo "Processing $REPO..."
-            mkdir -p "content/$REPO"
 
             # --- Fetch latest release ---
             RELEASE=$(curl -s \
@@ -73,21 +72,52 @@ jobs:
               continue
             fi
 
-            # --- Download release asset -> saved as literally "release" (LFS-tracked) ---
+            # --- Clear destination folder and recreate it ---
+            echo "Clearing existing content in content/$REPO..."
+            rm -rf "content/$REPO"
+            mkdir -p "content/$REPO"
+
+            # --- Download release asset with its original name ---
             echo "Downloading release asset: $ASSET_NAME"
             curl -sL \
               -H "Authorization: Bearer $TOKEN" \
               -H "Accept: application/octet-stream" \
-              -o "content/$REPO/release" \
+              -o "content/$REPO/$ASSET_NAME" \
               "$ASSET_URL"
 
             # --- Download README ---
             echo "Downloading README for $REPO"
-            curl -sL \
+            
+            # Try uppercase README.md first
+            STATUS=$(curl -sL -w "%{http_code}" \
               -H "Authorization: Bearer $TOKEN" \
               -H "Accept: application/vnd.github.raw+json" \
               "https://api.github.com/repos/$ORG/$REPO/contents/README.md" \
-              -o "content/$REPO/README.md"
+              -o "content/$REPO/README.md")
+
+            if [ "$STATUS" -ne 200 ]; then
+              rm -f "content/$REPO/README.md"
+              echo "README.md not found (status $STATUS). Trying readme.md..."
+              
+              # Fallback to lowercase readme.md
+              STATUS_LOWER=$(curl -sL -w "%{http_code}" \
+                -H "Authorization: Bearer $TOKEN" \
+                -H "Accept: application/vnd.github.raw+json" \
+                "https://api.github.com/repos/$ORG/$REPO/contents/readme.md" \
+                -o "content/$REPO/README.md")
+                
+              if [ "$STATUS_LOWER" -ne 200 ]; then
+                rm -f "content/$REPO/README.md"
+                echo "readme.md not found either (status $STATUS_LOWER)."
+              fi
+            fi
+
+            # Set manifest field value depending on whether a file was successfully saved
+            if [ -f "content/$REPO/README.md" ]; then
+              README_JSON_VAL="\"content/$REPO/README.md\""
+            else
+              README_JSON_VAL="null"
+            fi
 
             # --- Write per-repo manifest fragment ---
             cat > "tmp_manifest/$REPO.json" <<EOF
@@ -95,8 +125,8 @@ jobs:
             "version": "$VERSION",
             "released_at": "$RELEASED_AT",
             "original_filename": "$ASSET_NAME",
-            "release_file": "content/$REPO/release",
-            "readme_file": "content/$REPO/README.md"
+            "release_file": "content/$REPO/$ASSET_NAME",
+            "readme_file": $README_JSON_VAL
           }
           EOF
 
