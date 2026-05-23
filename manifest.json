@@ -12,5 +12,40 @@
     "original_filename": "google_ei_time.v1.0.1.exe",
     "release_file": "content/Google_EI_Parser/release",
     "readme_file": "content/Google_EI_Parser/README.md"
+  },
+  "FENDER": {
+    "version": "v0.2.6",
+    "released_at": "2026-05-14",
+    "original_filename": "FENDER.v0.2.6.exe",
+    "release_file": "content/FENDER/release",
+    "readme_file": "content/FENDER/README.md"
+  },
+  "Grits": {
+    "version": "v0.8.0",
+    "released_at": "2026-01-05",
+    "original_filename": "Grits_v0.8.0.zip",
+    "release_file": "content/Grits/release",
+    "readme_file": "content/Grits/README.md"
+  },
+  "Hashbrown": {
+    "version": "v0.1.4",
+    "released_at": "2026-05-18",
+    "original_filename": "Hashbrown.v0.1.4.zip",
+    "release_file": "content/Hashbrown/release",
+    "readme_file": "content/Hashbrown/README.md"
+  },
+  "Message-Maestro": {
+    "version": "v0.7.3",
+    "released_at": "2026-01-29",
+    "original_filename": "Message_Maestro_v0.7.3.exe",
+    "release_file": "content/Message-Maestro/release",
+    "readme_file": "content/Message-Maestro/README.md"
+  },
+  "Toast": {
+    "version": "v0.6.0",
+    "released_at": "2026-01-06",
+    "original_filename": "Toast_v0.6.0.zip",
+    "release_file": "content/Toast/release",
+    "readme_file": "content/Toast/README.md"
   }
 }
