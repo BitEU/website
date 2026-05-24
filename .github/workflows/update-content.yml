@@ -6,6 +6,8 @@ on:
       repo:
         description: 'Specific repo to update (leave empty to update all)'
         required: false
+  repository_dispatch:
+    types: [new_release]
 
 permissions:
   contents: write
@@ -31,14 +33,16 @@ jobs:
         id: repos
         env:
           MANUAL_REPO: ${{ github.event.inputs.repo }}
+          DISPATCH_REPO: ${{ github.event.client_payload.repo }}
           REPOS_VAR: ${{ vars.REPOS_LIST }}
         run: |
-          if [ -n "$MANUAL_REPO" ]; then
+          if [ -n "$DISPATCH_REPO" ]; then
+            echo "repos=$DISPATCH_REPO" >> $GITHUB_OUTPUT
+          elif [ -n "$MANUAL_REPO" ]; then
             echo "repos=$MANUAL_REPO" >> $GITHUB_OUTPUT
           elif [ -n "$REPOS_VAR" ]; then
             echo "repos=$REPOS_VAR" >> $GITHUB_OUTPUT
           else
-            # Fallback default if the variable is empty
             echo "repos=repo-one repo-two" >> $GITHUB_OUTPUT
           fi
 
