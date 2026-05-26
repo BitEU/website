@@ -16,6 +16,7 @@ I would also appreciate any assistance with analyzing QNX systems, as all of my 
     * [Python Users](#python-users)  
   * [Supported Vehicles](#supported-vehicles)  
   * [Features](#features)  
+  * [Command-Line Interface (CLI)](#command-line-interface-cli)
   * [System Requirements](#system-requirements)  
 * [Advanced Guide](#advanced-guide)  
   * [Architecture Overview](#architecture-overview)  
@@ -82,9 +83,9 @@ python main.py --cli
 * **Toyota TL19** \- Extracts GPS data from Toyota infotainment systems (.CE0 files)  
 * **Honda Telematics** \- Extracts GPS data from Honda Android eMMC images (.USER files)
 * **Honda TLHOBINN0D1** \- Extracts GPS data from Honda telematics binary files (.CE0, .bin, .001 files)
-* **Mercedes-Benz** \- Extracts GPS data from Mercedes-Benz database files (.db files)
-* **BMW NBT-HDD** \- Extracts GPS data from BMW NBT-HDD folder structure (folder)
-* **Stellantis** \- Extracts GPS data from a folder holding Stellantis log files (folder)
+* **Mercedes-Benz** \- Extracts GPS data directly from a raw Mercedes NTG5*2 head-unit image (.bin/.img/.dd/.001/.raw)
+* **BMW NBT-HDD** \- Extracts GPS data directly from a raw BMW NBT-HDD image (.bin/.img/.dd/.001/.raw)
+* **Stellantis** \- Extracts GPS data directly from a raw Stellantis vehicle eMMC/HDD image (.bin/.img/.dd/.001/.raw)
 * **Denso DNNS087** \- Extracts GPS, speed, and bluetooth data from Denso and Acura Android eMMC images (.001 files)
 * **Kia Dealer Mode** \- Extracts GPS data from Kia head unit dealer-mode log bundles (.tar.gz files)
 
@@ -96,6 +97,48 @@ python main.py --cli
 * 🖱️ Drag-and-drop file support  
 * 💻 Both GUI and command-line interfaces  
 * 🔌 Plugin architecture for easy decoder additions
+
+### **Command-Line Interface (CLI)**
+
+FENDER ships with an interactive CLI driven by `python main.py --cli` (or `FENDER.exe --cli` on the Windows release). Use it when:
+
+* You're working on a headless system / over SSH where the GUI isn't an option
+* You want to script extractions across multiple cases by piping stdin (see "Scripting" below)
+* You're benchmarking a decoder change and want a quick repeatable harness
+
+#### **Interactive walkthrough**
+
+```bash
+python main.py --cli
+```
+
+The CLI walks you through six prompts in order:
+
+1. **Decoder** — numbered list (Acura Denso DNNS087 = 1, BMW NBT-HDD = 2, Honda TLHOBINN0D1 = 3, Honda Telematics = 4, Kia Dealer Mode = 5, Mercedes NTG5*2 = 6, OnStar Gen 10+ = 7, Stellantis Vehicles = 8, Toyota TL19 = 9). Order is alphabetical by decoder name, so it shifts when decoders are added.
+2. **Export format** — `1` = XLSX, `2` = JSON, `3` = KML.
+3. **Examiner name** — optional; embedded in the XLSX/JSON metadata sheet.
+4. **Case number** — optional; embedded in the XLSX/JSON metadata sheet.
+5. **Input path** — either:
+   * A **raw image file** (`.bin`, `.img`, `.dd`, `.001`, `.raw`) for Stellantis / BMW NBT-HDD / Mercedes NTG5*2 — the decoder mounts every QNX6 partition inside and pulls the relevant log files or SQLite DBs (`/nav/trails.sqlite`, `/nav/trips.sqlite`, etc.) directly from the image. No need to know which partition holds them.
+   * A **single binary file** for the other decoders (`.CE0`, `.USER`, `.bin`, etc.).
+   * A **`.tar.gz` bundle** for Kia Dealer Mode.
+6. **Filter duplicate entries?** — `y` collapses entries that agree on lat/lon (4-decimal precision), timestamp, and source.
+
+Output filename is auto-generated as `<input-basename>_<decoder>_<YYYYMMDD_HHMMSS>.<ext>` next to the input file.
+
+#### **Scripting**
+
+The prompts read from stdin one line at a time, so you can pipe a here-doc to drive a non-interactive run. Example — extract Stellantis GPS from a Jeep eMMC image to XLSX with no duplicate filtering:
+
+```bash
+printf '8\n1\nYour Name\nCASE-1234\n/path/to/CFL-24-0170_EVD1_EMMC_ROM1.bin\nn\n' | python main.py --cli
+```
+
+The same shape works for BMW (decoder `2`) and Mercedes (decoder `6`) with their respective raw image paths.
+
+#### **Note on Stellantis / BMW / Mercedes input**
+
+These three decoders used to accept folders (Stellantis) or loose `.sqlite` files (BMW / Mercedes). They **no longer do** — they now accept only raw images and locate the relevant files inside the image's QNX6 partitions themselves. If you have a previously-extracted partition tree, run the QNX6 partitioner in reverse (or re-image the device) before feeding it to FENDER. The motivation is forensic provenance: the decoder reads bytes directly from the image and reports the internal POSIX path (e.g. `/persistentLogs/AASXMTC/Log1` or `/nav/trails.sqlite`) as the source rather than a host-filesystem path that's outside the chain of custody.
 
 ### **System Requirements**
 
@@ -262,50 +305,44 @@ Process:
 
 #### **Mercedes-Benz Decoder**
 
-File Format: Mercedes-Benz log files and folders  
-Data Location: Text-based log files in various locations  
-Extraction Method: Folder-based recursive search and pattern matching  
+File Format: Raw Mercedes NTG5*2 head-unit image (.bin/.img/.dd/.001/.raw)
+Data Location: `/nav/trails.sqlite` and `/nav/trips.sqlite` inside any QNX6 partition of the image
+Extraction Method: QNX6 partition mount → SQLite extraction → Trails/Trips schema detection → binary Path BLOB decode with Bounding-box filtering
 Process:
 
-1. Recursively scan folders for relevant log files  
-2. Parse log files for GPS coordinate patterns  
-3. Extract timestamp and location data using regex patterns  
-4. Convert coordinate formats to standard decimal degrees  
-
-**Key Log Patterns**:
-
-* Navigation system location logs  
-* Telematics service position reports  
-* COMAND system diagnostic logs  
-* Mercedes ME app synchronization data  
+1. Mount every QNX6 partition discovered in the raw image (the same image typically contains 5+ QNX6 partitions; we don't require the user to know which one holds `/nav/`)
+2. Locate `/nav/trails.sqlite` and `/nav/trips.sqlite` via the union-view file source; extract each to a private temp directory
+3. For each extracted DB, probe the schema: Mercedes' `trails.sqlite` carries a `Trails` table with `BeginTime`/`EndTime`/`Path`/`Bounding`; Mercedes' `trips.sqlite` carries a `Trips` table with `DepartureTime`/`ArrivalTime`/`Path`/`Bounding` (and sometimes a stub `Trails` table that the decoder safely skips)
+4. Decode the segmented Path BLOB (event_id 1 = GPS coordinates, lon/lat/elev as 32-bit ints); a 24-byte Bounding BLOB filters out marker-byte false positives
+5. Merge results from both DBs, dedupe, and emit rows tagged with their `SourceTable` (`/nav/trails.sqlite:Trails`, `/nav/trips.sqlite:Trips`)
 
 **Data Format**:
 
-* Coordinates stored in various formats (decimal degrees, DMS)  
-* Timestamps typically in ISO format or local system time  
-* Additional vehicle status information often available in context  
+* Coordinates encoded as int32 (`value * 180 / 2^31`); unsigned-to-signed conversion applied per Mercedes convention
+* Begin/Departure and End/Arrival times stored as Unix epoch
+* `Bounding` BLOB: 4-byte magic (`01 01 01 00`) + SW (lon, lat as i32, 4 pad bytes) + NE (lon, lat as i32, 4 pad bytes) = 24 bytes
 
 #### **Stellantis Decoder**
 
-File Format: Log files in persistent storage folders  
-Data Location: Debug logs, service logs, and navigation logs  
-Extraction Method: Recursive file search with multi-pattern matching  
+File Format: Raw Stellantis vehicle eMMC/HDD image (.bin/.img/.dd/.001/.raw)
+Data Location: Log files at fixed paths under various QNX6 partitions inside the image (e.g. `/persistentLogs/AASXMTC/Log*`)
+Extraction Method: QNX6 partition mount → glob across union view → text-mode line scan with multi-pattern matching
 Key patterns:
 
-- `SAL_SDARS_FUEL` - Navigation destination coordinates  
-- `NW_SOS` - Emergency call position data  
-- `SAL_KONA_NAVI` - Navigation system coordinates  
-- `GetCurrentLocAddressResponse` - Location service responses  
-- `JSR179InterfaceImpl` - Low-level positioning with speed data  
+- `SAL_SDARS_FUEL` - Navigation destination coordinates
+- `NW_SOS` - Emergency call position data
+- `SAL_KONA_NAVI` - Navigation system coordinates
+- `GetCurrentLocAddressResponse` - Location service responses
+- `JSR179InterfaceImpl` - Low-level positioning with speed data
 - `NaviTelematicsDataRequest` - Telematics position reports
 
 **Extraction Process**:
 
-1. Scan folder structure for log files matching predefined patterns  
-2. Parse files using regex patterns to extract GPS coordinates  
-3. Extract timestamps from log entries  
-4. Validate coordinates and convert to standard format  
-5. Sort entries chronologically  
+1. Mount every QNX6 partition in the raw image (typically 15+ partitions on a Stellantis dump)
+2. Glob for known log-file patterns (`**/pas_debug.log.*`, `**/persistentLogs/...`, `**/Logs/**/*.log*`, etc.) across all partitions; the decoder doesn't need to know which partition holds the logs
+3. Stream each matching file directly from the QNX6 image without writing it to disk; parse lines with the regex set above
+4. Extract timestamps from log entries, validate coordinates, and convert to standard format
+5. Sort entries chronologically; `Source_File` column carries the internal POSIX path inside the image (e.g. `/persistentLogs/AASXMTC/Log1`)
 
 **Data Format**:
 
@@ -355,40 +392,30 @@ The decoder creates separate data categories for comprehensive analysis:
 
 #### **BMW NBT-HDD Decoder**
 
-File Format: BMW NBT-HDD folder structure with SQLite database  
-Data Location: `trails.sqlite` database in `NBT-HDD/p2/nav/` directory  
-Extraction Method: Database extraction and binary path decoding  
+File Format: Raw BMW NBT-HDD image (.bin/.img/.dd/.001/.raw)
+Data Location: `/nav/trails.sqlite` and `/nav/trips.sqlite` inside any QNX6 partition of the image
+Extraction Method: QNX6 partition mount → SQLite extraction → schema detection → binary path decoding with Bounding-box filtering
 Process:
 
-1. Search for NBT-HDD folder structure in dropped folder/path  
-2. Locate `trails.sqlite` database at expected path: `NBT-HDD/p2/nav/trails.sqlite`  
-3. Query `Trails` table for navigation trail records  
-4. Decode binary path data to extract GPS coordinates  
-5. Convert timestamps from Unix format to UTC  
+1. Mount every QNX6 partition in the raw image; the decoder probes each for `/nav/` rather than requiring the user to identify the right partition (commonly `p2` but varies by case)
+2. Extract `/nav/trails.sqlite` and `/nav/trips.sqlite` to a private temp directory; both are processed
+3. Schema detection: `trails.sqlite` carries `Trails(BeginCoordinatedUniversalTime, EndCoordinatedUniversalTime, Path, Bounding, ...)`; `trips.sqlite` carries the same shape under `Trips(Departure*, Arrival*, ...)`
+4. Decode the marker-byte Path BLOB (0x1e = begin sample, 0x1d = end sample, each followed by 4-byte distance + 4-byte lon + 4-byte lat); a 28-byte Bounding BLOB rejects marker-byte false positives buried in other event payloads
+5. Merge entries from both DBs, dedupe, and emit rows tagged with their `SourceTable` (`/nav/trails.sqlite:Trails`, `/nav/trips.sqlite:Trips`)
 
-**Database Schema**:
+**Database Schemas**:
 
-- `TrailId` - Unique identifier for each navigation trail  
-- `BeginTime`, `EndTime` - Unix timestamps for trail start/end  
-- `Path` - Binary blob containing encoded GPS coordinates and events  
+- `TrailId` / `TripId` - Unique identifier per trail or trip
+- `BeginCoordinatedUniversalTime` / `DepartureCoordinatedUniversalTime` - Unix epoch start
+- `EndCoordinatedUniversalTime` / `ArrivalCoordinatedUniversalTime` - Unix epoch end
+- `Path` - Binary blob of marker-introduced GPS samples
+- `Bounding` - 28-byte SW/NE bounding box (used as a geographic filter against marker-byte false positives)
 
 **Path Binary Format**:
 
-* Similar to Mercedes-Benz NTG5*2 format  
-* GPS coordinates encoded as 32-bit integers  
-* Formula: `decoded_value = encoded_value * 180 / 2147483647`  
-* Multiple GPS events per trail with elevation data  
-
-**Expected Folder Structure**:
-
-Users should drag and drop the `NBT-HDD` folder, which contains:
-```
-NBT-HDD/
-├── p2/
-│   └── nav/
-│       └── trails.sqlite
-└── [other system folders]
-```
+* GPS coordinates encoded as signed 32-bit integers (no unsigned-to-signed cast, unlike Mercedes)
+* Formula: `decoded_value = encoded_value * 180 / 2147483647`
+* Multiple GPS events per trail; no per-sample elevation field (only the Bounding BLOB carries elevation)
 
 #### **Honda TLHOBINN0D1 Decoder**
 
@@ -626,16 +653,6 @@ Fully supported vehicles:
 
 Vehicles with partial (parse from file/folder, not disk image) support:
 
-* Mercedes-Benz
-* BMW Group
-  * BMW
-  * Mini
-* Stellantis
-  * Chrystler
-  * Dodge
-  * Ram
-  * Jeep
-  * Fiat
 * Hyundai Group
   * Kia (dealer-mode USB log bundle only)
 
