@@ -84,7 +84,7 @@ python main.py --cli
 * **Honda Telematics** \- Extracts GPS data from Honda Android eMMC images (.USER files)
 * **Honda TLHOBINN0D1** \- Extracts GPS data from Honda telematics binary files (.CE0, .bin, .001 files)
 * **Mercedes-Benz** \- Extracts GPS data directly from a raw Mercedes NTG5*2 head-unit image (.bin/.img/.dd/.001/.raw)
-* **BMW NBT-HDD** \- Extracts GPS data directly from a raw BMW NBT-HDD image (.bin/.img/.dd/.001/.raw)
+* **BMW NBT-HDD** \- Extracts GPS data from a raw BMW NBT-HDD image (.bin/.img/.dd/.001/.raw) **or** a manually-uploaded `trails.sqlite` / `trips.sqlite` (.sqlite/.db). Per-fix timestamps are reconstructed from the Path BLOB's TLV stream so each row carries its own UTC time (not just the trail BeginTime).
 * **Stellantis** \- Extracts GPS data directly from a raw Stellantis vehicle eMMC/HDD image (.bin/.img/.dd/.001/.raw)
 * **Denso DNNS087** \- Extracts GPS, speed, and bluetooth data from Denso and Acura Android eMMC images (.001 files)
 * **Kia Dealer Mode** \- Extracts GPS data from Kia head unit dealer-mode log bundles (.tar.gz files)
@@ -392,30 +392,38 @@ The decoder creates separate data categories for comprehensive analysis:
 
 #### **BMW NBT-HDD Decoder**
 
-File Format: Raw BMW NBT-HDD image (.bin/.img/.dd/.001/.raw)
-Data Location: `/nav/trails.sqlite` and `/nav/trips.sqlite` inside any QNX6 partition of the image
-Extraction Method: QNX6 partition mount → SQLite extraction → schema detection → binary path decoding with Bounding-box filtering
+File Format: Raw BMW NBT-HDD image (.bin/.img/.dd/.001/.raw) **or** a manually-supplied `trails.sqlite` / `trips.sqlite` (.sqlite/.db)
+Data Location: `/nav/trails.sqlite` and `/nav/trips.sqlite` inside any QNX6 partition of the image; for direct uploads the file is processed in place
+Extraction Method: QNX6 partition mount (image inputs only) → SQLite extraction → schema detection → TLV-stream decoding of the Path BLOB with Bounding-box filtering and per-fix timestamp reconstruction
 Process:
 
-1. Mount every QNX6 partition in the raw image; the decoder probes each for `/nav/` rather than requiring the user to identify the right partition (commonly `p2` but varies by case)
+1. Mount every QNX6 partition in the raw image; the decoder probes each for `/nav/` rather than requiring the user to identify the right partition (commonly `p2` but varies by case). If the input is a `.sqlite`/`.db`, the QNX6 mount is skipped and the file is read directly — useful for working with DBs already pulled by another tool while keeping the same decode pipeline.
 2. Extract `/nav/trails.sqlite` and `/nav/trips.sqlite` to a private temp directory; both are processed
-3. Schema detection: `trails.sqlite` carries `Trails(BeginCoordinatedUniversalTime, EndCoordinatedUniversalTime, Path, Bounding, ...)`; `trips.sqlite` carries the same shape under `Trips(Departure*, Arrival*, ...)`
-4. Decode the marker-byte Path BLOB (0x1e = begin sample, 0x1d = end sample, each followed by 4-byte distance + 4-byte lon + 4-byte lat); a 28-byte Bounding BLOB rejects marker-byte false positives buried in other event payloads
-5. Merge entries from both DBs, dedupe, and emit rows tagged with their `SourceTable` (`/nav/trails.sqlite:Trails`, `/nav/trips.sqlite:Trips`)
+3. Schema detection: `trails.sqlite` carries `Trails(BeginCoordinatedUniversalTime, EndCoordinatedUniversalTime, Path, Bounding, Length, DurationTime, ...)`; `trips.sqlite` carries the same shape under `Trips(Departure*, Arrival*, ...)`
+4. Walk the Path BLOB as a d-monotone TLV stream. Each record begins with a 1-byte tag and a 4-byte cumulative-distance `d` (centimetres). GPS markers (`0x1e` = begin sample, `0x1d` = end sample) carry a 4-byte longitude + 4-byte latitude as signed int32. Time-anchor records (`0x02`) carry a 4-byte `v_ms` value — milliseconds since the trail's first GPS lock. Other tags (`0x07`, `0x15`, `0x16`, `0x17`, `0x1f`, `0x20`, `0x22`, `0x24`, `0x72`) are sized from a known table; unknown tags are resynced byte-by-byte using d-monotonicity as the validity constraint
+5. For each GPS event, look up the co-located `0x02` time anchor and compute `fix_unix = BeginCoordinatedUniversalTime + (v_ms − v0_ms) / 1000`. Parking is detected when multiple `0x02` records share a `d` but `v_ms` jumps by more than 30 seconds — the decoder emits both a pre-park and a wake-up fix so the parked interval is preserved
+6. Merge entries from both DBs, dedupe, and emit rows tagged with their `SourceTable` (`/nav/trails.sqlite:Trails`, `/nav/trips.sqlite:Trips`) and a per-fix `FixTime_UTC` column
 
 **Database Schemas**:
 
 - `TrailId` / `TripId` - Unique identifier per trail or trip
 - `BeginCoordinatedUniversalTime` / `DepartureCoordinatedUniversalTime` - Unix epoch start
 - `EndCoordinatedUniversalTime` / `ArrivalCoordinatedUniversalTime` - Unix epoch end
-- `Path` - Binary blob of marker-introduced GPS samples
-- `Bounding` - 28-byte SW/NE bounding box (used as a geographic filter against marker-byte false positives)
+- `Length` - Total trail distance in centimetres (used to cap the TLV parser's `d` range)
+- `DurationTime` - Trail duration in milliseconds (used to reject desync'd `0x02` anchors whose v_ms exceeds the real trip length)
+- `Path` - Binary TLV stream of GPS samples, time anchors, and other event records
+- `Bounding` - 28-byte SW/NE bounding box used as a geographic filter against marker-byte false positives
 
 **Path Binary Format**:
 
-* GPS coordinates encoded as signed 32-bit integers (no unsigned-to-signed cast, unlike Mercedes)
-* Formula: `decoded_value = encoded_value * 180 / 2147483647`
-* Multiple GPS events per trail; no per-sample elevation field (only the Bounding BLOB carries elevation)
+* Header begins with `0a 01 01 00 01 00`. The byte at offset 0x16 discriminates between the short (0x24 → 45-byte header) and long (0x22 → 65-byte header) variants observed in the wild
+* GPS coordinates encoded as signed 32-bit integers (no unsigned-to-signed cast, unlike Mercedes); formula: `decoded_value = encoded_value * 180 / 2147483647`
+* `d` is cumulative distance in centimetres (matches the row's `Length` column at end-of-trail) and is strictly non-decreasing across the stream
+* `v_ms` in `0x02` records is milliseconds since first GPS lock (matches `DurationTime` at end-of-trail). Berla iVE's per-fix timestamps are reproduced to within ~1 second for 99.7%+ of fixes across 1000+ validated trails
+
+**Validating against Berla iVE**:
+
+The decoder's accuracy was developed against Berla iVE's `journey-*.txt` exports as ground truth. Across 1000+ trails from a real case dataset, drift vs. Berla measured: p50 = 0.5 s, p90 = 1.3 s, p99 = 2.1 s, p99.9 = 7.6 s. The remaining tail is dominated by Berla emitting synthetic heartbeat fixes during long parks that aren't physically present in the Path BLOB.
 
 #### **Honda TLHOBINN0D1 Decoder**
 
@@ -582,7 +590,7 @@ class GPSEntry:
 Each decoder can define custom columns, but typically includes:
 
 * Latitude/Longitude coordinates  
-* Timestamp information  
+* Timestamp information (per-fix where the source format carries it — e.g. BMW NBT-HDD emits a `FixTime_UTC` column alongside the trail-level Begin/EndTime)
 * Decoder-specific metadata  
 * Hex representations (for debugging and data verification)
 
