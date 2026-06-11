@@ -45,79 +45,57 @@
             <h2 class="section-title fade-in">Projects & Tools</h2>
             <div class="tools-grid">
                 <!-- Tool Box 1: Hashbrown -->
-                <div class="tool-card fade-in" data-tool-folder="content/Hashbrown" data-tool-extension=".zip">
+                <div class="tool-card fade-in" data-repo-name="Hashbrown">
                     <span class="tool-icon">🎬</span>
                     <h3>Hashbrown</h3>
                     <p>A video redaction tool designed for legal and investigative professionals. It allows users to selectively mute audio within specific time segments of a video file.</p>
                     <div class="tool-buttons">
                         <a href="#" class="btn-download" download><span class="version-tag">Loading...</span></a>
-                        <a href="reader.html?file=content/Hashbrown/readme.md" class="btn-read">Read More</a>
+                        <a href="" class="btn-read">Read More</a>
                     </div>
                 </div>
 
                 <!-- Tool Box 2: FENDER -->
-                <div class="tool-card fade-in" data-tool-folder="content/FENDER" data-tool-extension=".exe">
+                <div class="tool-card fade-in" data-repo-name="FENDER">
                     <span class="tool-icon">🚗</span>
                     <h3>FENDER</h3>
                     <p>A tool to extract GPS location data from multiple vehicle manufacturers and provides an easy-to-use interface for forensic investigators.</p>
                     <div class="tool-buttons">
                         <a href="#" class="btn-download" download><span class="version-tag">Loading...</span></a>
-                        <a href="reader.html?file=content/FENDER/readme.md" class="btn-read">Read More</a>
+                        <a href="" class="btn-read">Read More</a>
                     </div>
                 </div>
 
-                <!-- Tool Box 3: Google EI Parser -->
-                <div class="tool-card fade-in" data-tool-folder="content/Google EI Parser" data-tool-extension=".exe">
-                    <span class="tool-icon">🔍</span>
-                    <h3>Google EI Parser</h3>
-                    <p>Extracts and decodes the Google Search 'ei' parameter into human-readable timestamps.</p>
-                    <div class="tool-buttons">
-                        <a href="#" class="btn-download" download><span class="version-tag">Loading...</span></a>
-                        <a href="reader.html?file=content/Google EI Parser/README.md" class="btn-read">Read More</a>
-                    </div>
-                </div>
-
-                <!-- Tool Box 4: Message Maestro -->
-                <div class="tool-card fade-in" data-tool-folder="content/Message Maestro" data-tool-extension=".exe">
+                <!-- Tool Box 3: Message Maestro -->
+                <div class="tool-card fade-in" data-repo-name="Message-Maestro">
                     <span class="tool-icon">💬</span>
                     <h3>Message Maestro</h3>
                     <p>View, tag, analyze, and export conversations from Kik, Snapchat, and Twitter.</p>
                     <div class="tool-buttons">
                         <a href="#" class="btn-download" download><span class="version-tag">Loading...</span></a>
-                        <a href="reader.html?file=content/Message Maestro/readme.md" class="btn-read">Read More</a>
+                        <a href="" class="btn-read">Read More</a>
                     </div>
                 </div>
 
-                <!-- Tool Box 5: COMRADE -->
-                <div class="tool-card fade-in" data-tool-folder="content/COMRADE" data-tool-extension=".exe">
+                <!-- Tool Box 4: COMRADE -->
+                <div class="tool-card fade-in" data-repo-name="COMRADE">
                     <span class="tool-icon">🔗</span>
                     <h3>COMRADE</h3>
                     <p>A GUI application for visualizing and managing complex relationship networks, mainly for mapping organized criminal groups.</p>
                     <div class="tool-buttons">
                         <a href="#" class="btn-download" download><span class="version-tag">Loading...</span></a>
-                        <a href="reader.html?file=content/COMRADE/README.md" class="btn-read">Read More</a>
+                        <a href="" class="btn-read">Read More</a>
                     </div>
                 </div>
 
-                <!-- Tool Box 6: Grits -->
-                <div class="tool-card fade-in" data-tool-folder="content/Grits" data-tool-extension=".zip">
-                    <span class="tool-icon">🔊</span>
-                    <h3>Grits</h3>
-                    <p>A media amplification tool that allows users to easily adjust the volume of video or audio files with preset or custom amplification options.</p>
-                    <div class="tool-buttons">
-                        <a href="#" class="btn-download" download><span class="version-tag">Loading...</span></a>
-                        <a href="reader.html?file=content/Grits/readme.md" class="btn-read">Read More</a>
-                    </div>
-                </div>
-
-                <!-- Tool Box 7: Toast -->
-                <div class="tool-card fade-in" data-tool-folder="content/Toast" data-tool-extension=".zip">
+                <!-- Tool Box 5: Toast -->
+                <div class="tool-card fade-in" data-repo-name="Toast">
                     <span class="tool-icon">🍞</span>
                     <h3>Toast</h3>
                     <p>A high-performance desktop app for visualizing call detail record (CDR) relationships with automatic community detection.</p>
                     <div class="tool-buttons">
                         <a href="#" class="btn-download" download><span class="version-tag">Loading...</span></a>
-                        <a href="reader.html?file=content/Toast/README.md" class="btn-read">Read More</a>
+                        <a href="" class="btn-read">Read More</a>
                     </div>
                 </div>
             </div>
@@ -133,46 +111,67 @@
     </section>
 
     <script>
+        async function loadJson(url) {
+            try {
+                const response = await fetch(url);
+                
+                // Check if the request was successful (status code 200-299)
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                
+                // Parse the response body as JSON
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                console.error("Failed to load or parse JSON:", error);
+            }
+        }
+
+
         // Dynamic download link loader using GitHub API
         async function loadLatestDownloads() {
-            const toolCards = document.querySelectorAll('[data-tool-folder]');
-            const repoOwner = 'WCDAHT';
-            const repoName = 'WCDAHT.github.io';
-            
-            for (const card of toolCards) {
-                const folder = card.getAttribute('data-tool-folder');
-                const extension = card.getAttribute('data-tool-extension');
-                const downloadBtn = card.querySelector('.btn-download');
-                const versionTag = card.querySelector('.version-tag');
-                
-                try {
-                    const response = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/contents/${folder}`);
-                    const files = await response.json();
-                    
-                    // Filter files by extension
-                    const matchingFiles = files.filter(file => file.name.endsWith(extension));
-                    
-                    if (matchingFiles.length > 0) {
-                        // Sort by name (assumes version is in filename) - get the latest
-                        matchingFiles.sort((a, b) => b.name.localeCompare(a.name));
-                        const latestFile = matchingFiles[0];
+            const toolCards = document.querySelectorAll('.tool-card');
+            const url = '/manifest.json';
+
+            loadJson(url).then(manifestData => {
+                if (manifestData) {
+                    for (const card of toolCards) {
+                        const repoName = card.getAttribute('data-repo-name');
+                        const downloadBtn = card.querySelector('.btn-download');
+                        const readmeBtn = card.querySelector('.btn-read');
+                        const versionTag = card.querySelector('.version-tag');
+
+                        const repoOwner = 'WCDAHT';
+                        const websiteRepoName = 'WCDAHT.github.io';
+
+                        if (manifestData[repoName] === undefined) {
+                            console.log(`Repository ${repoName} not found in manifest`);
+                            continue;
+                        }
                         
-                        // Update download link using Git LFS media URL
-                        downloadBtn.href = `https://media.githubusercontent.com/media/${repoOwner}/${repoName}/main/${folder}/${latestFile.name}`;
-                        downloadBtn.setAttribute('download', latestFile.name);
-                        
-                        // Extract and display version (matches patterns like v0.7.1 or 0.2.5)
-                        const versionMatch = latestFile.name.match(/v?(\d+\.\d+(?:\.\d+)?)/);
-                        const version = versionMatch ? `v${versionMatch[1]}` : '';
-                        versionTag.textContent = version;
-                    } else {
-                        versionTag.textContent = '(file not found)';
+                        try {
+                            const releaseFilePath = manifestData[repoName]["release_file"];
+                            const originalFileName = manifestData[repoName]["original_filename"];
+                            const version = manifestData[repoName]["version"];
+                            
+                            // Update download link using Git LFS media URL
+                            downloadBtn.href = `https://media.githubusercontent.com/media/${repoOwner}/${websiteRepoName}/main/${releaseFilePath}`;
+                            downloadBtn.setAttribute('download', originalFileName);
+
+                            readmeBtn.href = `reader.html?file=${manifestData[repoName]["readme_file"]}`;
+                            
+                            versionTag.textContent = version;
+                            
+                        } catch (error) {
+                            console.error(`Error loading files for ${repoName}:`, error);
+                            versionTag.textContent = '(error loading)';
+                        }
                     }
-                } catch (error) {
-                    console.error(`Error loading files for ${folder}:`, error);
-                    versionTag.textContent = '(error loading)';
                 }
-            }
+            });
+            
+            
         }
         
         // Fade in animation on scroll

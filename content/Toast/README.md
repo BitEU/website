@@ -58,6 +58,10 @@ cd build
 .\Toast.exe
 ```
 
+And when quickly iterating:
+1. ```cd .. ; .\build.bat "C:\Qt\6.10.1\mingw_64"```
+2. ```cd build ; .\Toast.exe```
+
 ## Usage
 
 ### 1. Load CDR Data
@@ -81,6 +85,13 @@ Click **Stop Layout** when satisfied with the arrangement.
 - **Reset Zoom**: Return to default view
 - **Select Node**: Double left-click to select/deselect and highlight connections
 - **Cycle Node Color**: Press 'c' key while node is selected to change its color
+
+#### Mouse Wheel / Middle Button Behaviors
+- **Scroll wheel**: Scrolls vertically.
+- **Scroll wheel + CTRL:** Zooms in/out (same behavior as the Zoom In/Zoom Out buttons up top).
+- **Scroll wheel + SHIFT:** Scrolls horizontally.
+
+These behaviors help quickly navigate large graphs: hold middle and Ctrl to zoom, or hold middle and Shift to pan left/right using the wheel.
 
 ### 4. Add Labels
 Double **right-click** any phone number box to add a custom label (e.g., person's name). Double left-click selects/deselects the node and highlights its connections.

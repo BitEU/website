@@ -1,0 +1,37 @@
+{
+  "COMRADE": {
+    "version": "v0.7.5",
+    "released_at": "2025-07-24",
+    "original_filename": "COMRADE.v0.7.5.exe",
+    "release_file": "content/COMRADE/COMRADE.v0.7.5.exe",
+    "readme_file": "content/COMRADE/README.md"
+  },
+  "FENDER": {
+    "version": "v0.2.8",
+    "released_at": "2026-06-02",
+    "original_filename": "FENDER.v0.2.8.exe",
+    "release_file": "content/FENDER/FENDER.v0.2.8.exe",
+    "readme_file": "content/FENDER/README.md"
+  },
+  "Hashbrown": {
+    "version": "v0.1.5",
+    "released_at": "2026-05-26",
+    "original_filename": "Hashbrown.v0.1.5.7z",
+    "release_file": "content/Hashbrown/Hashbrown.v0.1.5.7z",
+    "readme_file": "content/Hashbrown/README.md"
+  },
+  "Message-Maestro": {
+    "version": "v0.7.3",
+    "released_at": "2026-01-29",
+    "original_filename": "Message_Maestro_v0.7.3.exe",
+    "release_file": "content/Message-Maestro/Message_Maestro_v0.7.3.exe",
+    "readme_file": "content/Message-Maestro/README.md"
+  },
+  "Toast": {
+    "version": "v0.6.0",
+    "released_at": "2026-01-06",
+    "original_filename": "Toast_v0.6.0.zip",
+    "release_file": "content/Toast/Toast_v0.6.0.zip",
+    "readme_file": "content/Toast/README.md"
+  }
+}
