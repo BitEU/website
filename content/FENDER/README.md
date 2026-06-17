@@ -688,7 +688,7 @@ Currently unsupported:
 1. Fork the repository  
 2. Create a feature branch  
 3. Add your decoder to `decoders/`  
-4. Include test files for validation. If you are unable to publically supply them due to sensitive content or an ongoing investigation, please contact sschiavone@westchesterda.net.
+4. Include test files for validation. If you are unable to publically supply them due to sensitive content or an ongoing investigation, please contact sschiavone@pace.edu.
 5. Submit a pull request
 
 ## **Credits**

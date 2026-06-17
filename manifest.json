@@ -7,10 +7,10 @@
     "readme_file": "content/COMRADE/README.md"
   },
   "FENDER": {
-    "version": "v0.2.8",
-    "released_at": "2026-06-02",
-    "original_filename": "FENDER.v0.2.8.exe",
-    "release_file": "content/FENDER/FENDER.v0.2.8.exe",
+    "version": "v0.3.0",
+    "released_at": "2026-06-17",
+    "original_filename": "FENDER.v0.3.0.exe",
+    "release_file": "content/FENDER/FENDER.v0.3.0.exe",
     "readme_file": "content/FENDER/README.md"
   },
   "Hashbrown": {
