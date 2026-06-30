@@ -1,316 +1,134 @@
-# 🔗 COMRADE - Connection Object Mapping and Relational Assessment Database Engine 
+# COMRADE
 
-A modern, interactive Python GUI application for visualizing and managing complex relationship networks between people, textboxes, and legend cards. COMRADE provides an intuitive interface for creating, editing, and exploring connection networks with a beautiful, modern design and powerful data management capabilities.
+**C**onnection **O**bject **M**apping **A**nd **R**elational **A**ssessment **D**atabase **E**ngine — a desktop investigator board for mapping people, notes, and the relationships between them. An analyst places **cards** (Person / Note / Legend) on an infinite, zoomable canvas and draws **labeled, directional relationships** between any of them. It is offline and single-user: everything lives in a local `.comrade` file, with no network access. Built with Rust + Tauri 2 + Svelte 5 and [Svelte Flow](https://svelteflow.dev) for the canvas.
 
-## 📋 Table of Contents
+## Screenshot
 
-- [🔗 COMRADE](#-comrade---connection-object-mapping-and-relational-assessment-database-engine)
-  - [📋 Table of Contents](#-table-of-contents)
-  - [✨ Features](#-features)
-  - [🚀 Getting Started](#-getting-started)
-    - [Prerequisites](#prerequisites)
-    - [Installation](#installation)
-    - [Running the Application](#running-the-application)
-  - [💻 Usage](#-usage)
-    - [Adding Content](#adding-content)
-    - [Creating Connections](#creating-connections)
-    - [Editing Information](#editing-information)
-    - [Navigation Controls](#navigation-controls)
-    - [Data Management](#data-management)
-    - [Clipboard Operations](#clipboard-operations)
-  - [🎨 Interface Overview](#-interface-overview)
-  - [🔧 Technical Details](#-technical-details)
-    - [Architecture](#architecture)
-    - [Dependencies](#dependencies)
-    - [Data Format](#data-format)
-  - [⌨️ Keyboard Shortcuts](#️-keyboard-shortcuts)
-  - [🎯 Features in Detail](#-features-in-detail)
-    - [Card Management](#card-management)
-    - [Connection System](#connection-system)
-    - [Visual Design](#visual-design)
-    - [Zoom and Pan](#zoom-and-pan)
-    - [File Attachments](#file-attachments)
-  - [ℹ️ Frequently Asked Questions](#ℹ️-frequently-asked-questions)
-  - [📄 License](#-license)
-  - [🤝 Contributing](#-contributing)
+<!-- Drop a screenshot or animated GIF of the current UI here (STANDARDS §5.3). -->
 
-## ✨ Features
+## Install / run
 
-### **🃏 Multi-Card System**
-- **👤 Person Cards**: Comprehensive people profiles with detailed information
-- **📝 Textbox Cards**: Rich text content cards for notes, documentation, and context
-- **📊 Legend Cards**: Color-coded legend system for visual organization
+Prerequisites: a [Rust toolchain](https://rustup.rs), [Node.js](https://nodejs.org) 20+,
+and the [Tauri prerequisites](https://tauri.app/start/prerequisites/) for your OS
+(on Linux, the WebKitGTK dev packages; on Windows/macOS the system webview is built in).
 
-### **👤 Person Management**
-- Full Name, Date of Birth, Alias/Nickname
-- Address, Phone Number, SSN, Email
-- File attachments (images, documents, etc.)
-- Profile picture support with auto-resizing
-- Color-coding system with cycling colors
-
-### **📝 Content Management**
-- Rich textbox cards with title and content areas
-- Legend cards with customizable color-coding system
-- Comprehensive note-taking capabilities
-- Visual organization tools
-
-### **🔗 Advanced Connection System**
-- **Interactive Creation**: Right-click to start/complete connections
-- **Universal Connections**: Connect any card type to any other card type
-- **Labeled Relationships**: Custom connection labels with visual styling
-- **Connection Editing**: Double-click labels to edit descriptions
-- **Visual Feedback**: Highlighted cards during connection mode
-
-### **🎨 Modern UI Design**
-- **Card-Based Design**: Beautiful cards with shadows, rounded corners, and professional styling
-- **Color System**: Consistent color coding across all card types
-- **Hover Effects**: Smooth visual feedback and interaction cues
-- **Modern Typography**: Clean Segoe UI font family throughout
-- **Professional Theme**: Carefully crafted color palette and spacing
-
-### **🔍 Interactive Canvas**
-- **Advanced Zoom**: Smooth zoom with mouse wheel (0.5x to 1.0x range)
-- **Pan Navigation**: Middle mouse button dragging for canvas navigation
-- **Drag & Drop**: Intuitive repositioning of all card types
-- **Grid System**: Visual alignment grid with zoom-aware scaling
-- **Smart Positioning**: Auto-placement of new cards at (500, 500)
-
-### **📋 Clipboard System**
-- **Copy/Cut/Paste**: Full clipboard support for all card types
-- **Smart Positioning**: Paste cards at mouse cursor location
-- **Data Preservation**: Maintains card data while clearing connections
-- **Cross-Session**: Clipboard persists during application session
-
-### **💾 Robust Data Management**
-- **ZIP Project Format**: Complete project packaging with file attachments
-- **Legacy Support**: Backward compatibility with CSV format
-- **File Organization**: Automatic extraction and cleanup of attached files
-- **Fuzzy Name Detection**: Warns about similar card names to prevent duplicates
-- **Auto-Updates**: Built-in update checking system
-
-### **🔧 Performance Optimizations**
-- **Efficient Rendering**: Direct canvas manipulation during drag operations
-- **Image Caching**: LRU cache for scaled images to improve zoom performance
-- **Debounced Updates**: Optimized zoom and text scaling with 50ms debouncing
-- **Memory Management**: Proper cleanup of canvas items and cached resources
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-- Python 3.7 or higher
-- tkinter (usually included with Python)
-- Pillow (PIL) for image handling and PNG export (recommended)
-
-### Installation
-
-1. Clone the repository:
-```bash
-git clone <repository-url>
-cd COMRADE
+```powershell
+npm install          # once, to pull frontend deps
+npm run tauri dev    # run the app with hot-reload
 ```
 
-2. Install dependencies:
-```bash
-pip install -r requirements.txt
+`npm run tauri dev` starts the Vite dev server and the Rust shell together; edits
+to Svelte/CSS hot-reload, edits to Rust trigger a recompile.
+
+## Features
+
+- **Cards:** Person (multiple labeled phones / addresses / emails, structured identifiers — SSN / DMV / FBI / NY — plus DOB, aliases, free-text *extra*, and arbitrary custom fields), Note (title + multi-line body), and Legend (a category → meaning key). Multiple legends allowed.
+- **Relationships:** edges are first-class records between any two cards, with an optional label and a style — per-end arrowheads, solid / dashed / dotted lines, thickness, curve, and an optional category color.
+- **Canvas:** infinite pan / zoom (wide range), minimap, background grid, box- and shift-select, and group move — all native to Svelte Flow.
+- **Detail levels:** Full / Essential / Minimal control how much each card renders, so a data-rich board stays legible. Global and persisted.
+- **Inspector:** a right-docked, modeless panel edits the selected card or edge live (no modal dialogs), with inline non-blocking validation.
+- **Search & dedup:** the header search matches across *every* field of every card and dims non-matches; adding a Person whose name resembles an existing one shows an inline duplicate warning (fuzzy, Jaro–Winkler).
+- **Relationship focus:** a toggle opens a panel of the selected card's connected component and traces the shortest path to any member, dimming everything else.
+- **Attachments:** attach files to a card (picker or drag-and-drop); the first image renders as a thumbnail. Bytes live on disk, never in the document, so undo and IPC stay small.
+- **Undo / redo, clipboard:** full undo history; in-session copy / cut / paste (internal relationships preserved) and duplicate.
+- **Export:** the board to a high-resolution **PNG** or a one-page **PDF**.
+- **Persistence:** a native `.comrade` bundle (a zip of `document.json` + an `assets/` tree), written atomically; a single rolling crash-recovery autosave offers to restore unsaved work on the next launch.
+- **Backward compatibility:** one-way **Convert** of legacy COMRADE files (the old `.zip`-with-`data.csv`, and the bare people-only `.csv`) into a `.comrade` bundle, attachments and all.
+
+### Supported file formats
+
+| Format | Read | Write | Notes |
+|--------|------|-------|-------|
+| `.comrade` bundle | ✓ | ✓ | native format (zip: `manifest.json` + `document.json` + `assets/`) |
+| Legacy COMRADE `.zip` (`data.csv` + `files/`) | ✓ (Convert) | — | one-way import → saved as `.comrade` |
+| Legacy bare `.csv` (people-only) | ✓ (Convert) | — | one-way import → saved as `.comrade` |
+| PNG / PDF | — | ✓ (export) | board image / one-page document |
+
+## Keyboard shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl+S` | Save |
+| `Ctrl+F` | Find / focus search |
+| `Ctrl+Z` | Undo |
+| `Ctrl+Shift+Z` / `Ctrl+Y` | Redo |
+| `Ctrl+C` / `Ctrl+X` / `Ctrl+V` | Copy / Cut / Paste (at the cursor) |
+| `Ctrl+D` | Duplicate selection |
+| `Delete` / `Backspace` | Remove selection (with confirmation) |
+| `1` / `2` / `3` | Detail level: Full / Essential / Minimal |
+| `F1` | Keyboard shortcuts help |
+| `Esc` | Deselect / close panel or dialog |
+
+Edges are created by dragging from a card's side handle to another card (drop on empty canvas to quick-connect a new card). Right-click a node, edge, or the canvas for a context menu.
+
+## Architecture
+
+A Cargo workspace of two Rust crates plus a Svelte frontend. `comrade-core` holds all
+logic and depends on no UI or Tauri code (it is testable headless). `src-tauri` is a thin
+Tauri shell that wires `#[tauri::command]`s to the core and owns the open document. `frontend/`
+is the Svelte 5 + TypeScript app, which talks to the shell only through typed IPC wrappers and
+treats its own state as a projection of what the core knows. `Cargo.toml` and `package.json`
+stay at the root (the CLIs resolve their code dirs from there).
+
+```
+comrade/
+├── Cargo.toml            # Rust workspace
+├── package.json          # frontend deps + scripts (dev → vite frontend)
+├── comrade-core/         # all logic; no UI/Tauri deps; testable headless
+│   ├── src/
+│   │   ├── model/        # Document, Node, Person/Note/Legend, Edge, Attachment, Category
+│   │   ├── parser/       # legacy importers (old zip, bare csv)
+│   │   ├── service/      # document, import, search, graph, history, assets,
+│   │   │                 #   recovery, png/pdf export, config, logging, task
+│   │   ├── app.rs        # identity constants (COMRADE / IcebergForensics)
+│   │   └── error.rs      # crate Error enum (thiserror)
+│   └── tests/fixtures/   # real input samples for the importer/round-trip tests
+├── src-tauri/            # Tauri shell (Rust)
+│   ├── src/{main.rs,lib.rs,commands.rs,dto.rs,state.rs,error.rs}
+│   ├── capabilities/     # least-privilege permission grants
+│   ├── icons/            # generated by `tauri icon`
+│   └── tauri.conf.json
+├── frontend/             # Svelte frontend (Vite root)
+│   ├── index.html, vite.config.ts, svelte.config.js, tsconfig.json
+│   └── src/
+│       ├── App.svelte, main.ts
+│       ├── styles/{theme.css,global.css}      # design tokens
+│       └── lib/
+│           ├── ipc.ts, types.ts, clipboard.svelte.ts, boardActions.ts, theme.ts
+│           ├── stores/         # board / view / session / search / focus / attachments
+│           ├── nodes/, edges/  # Svelte Flow card + edge components
+│           ├── views/, components/
+│           └── assets/         # fonts, license texts
+├── .github/workflows/    # CI: fmt + clippy + test + svelte-check + bundle, 3 OSes
+├── docs/
+├── analysis_todo.md      # in-repo backlog (STANDARDS §5.4)
+└── STANDARDS.md          # this workspace's conventions
 ```
 
-### Running the Application
+## Build
 
-```bash
-python main.py
+```powershell
+npm run tauri build   # release bundle
+npm run check         # svelte-check (frontend type safety)
+cargo test            # core integration + unit tests
 ```
 
-## 💻 Usage
+`npm run tauri build` produces the platform bundle under `src-tauri/target/release/bundle/`
+(`.msi`/`.exe` on Windows, `.dmg`/`.app` on macOS, `.deb`/`.AppImage` on Linux). CI builds and
+tests for Windows 11 x64, Linux x86_64, and macOS Apple Silicon on every push and PR — checking
+formatting, clippy (warnings denied), `cargo test`, `svelte-check`, and a full bundle build.
 
-### Adding Content
+## License
 
-#### **Person Cards**
-1. Click **"👤 Add Person"** in the toolbar
-2. Fill in personal information (name, DOB, address, etc.)
-3. Attach files by clicking **"Attach Files"** and selecting documents/images
-4. Click **"Save"** to add the person to the canvas
+Proprietary, all rights reserved. See [LICENSE.txt](./LICENSE.txt). Copyright held by
+Steven R. Schiavone. Internal-use grants are extended to Iceberg Forensics LLC and the
+Westchester County District Attorney's Office High Tech Crime Bureau, each for their own
+forensic work (no redistribution or sublicensing).
 
-#### **Textbox Cards**
-1. Click **"📝 Add Textbox"** in the toolbar
-2. Enter a title and rich text content
-3. Use textbox cards for notes, documentation, or contextual information
-4. Click **"Save"** to add the textbox to the canvas
+Bundled third-party components ship under their respective upstream licenses: the Inter
+font (SIL Open Font License 1.1), Bootstrap Icons (MIT), and the Tauri / Svelte / Vite
+toolchain (MIT or Apache-2.0). The About panel surfaces the full license texts.
 
-#### **Legend Cards**
-1. Click **"📊 Edit Legend"** in the toolbar
-2. Create color-coded entries to organize your network
-3. Use legends to explain color meanings or categorize relationships
-4. Click **"Save"** to update the legend
+---
 
-### Creating Connections
-
-1. **Right-click** on any card to start a connection
-2. The card will be highlighted and a temporary line will follow your mouse
-3. **Right-click** on another card to complete the connection
-4. Enter a label for the connection (e.g., "Friend", "Colleague", "Reports to")
-5. Press **Escape** to cancel a connection in progress
-
-### Editing Information
-
-- **Double-click** any card to edit its information
-- **Double-click** connection labels to edit relationship descriptions
-- **Delete key** to remove selected connections or cards
-- **C key** to cycle through colors for person and textbox cards
-
-### Navigation Controls
-
-- **Drag** any card to reposition it
-- **Mouse wheel** to zoom in/out (0.5x to 1.0x range)
-- **Middle mouse button + drag** to pan around the canvas
-- **Zoom slider** in the status bar for precise zoom control
-
-### Data Management
-
-- **💾 Save Project**: Export complete network to ZIP file with all attachments
-- **📁 Load Project**: Import previously saved projects (ZIP or legacy CSV)
-- **🖼️ Export PNG**: Generate high-quality PNG image of your network
-- **🗑️ Clear All**: Remove all content with confirmation dialog
-- **🔄 Check Updates**: Automatic update checking with manual option
-
-### Clipboard Operations
-
-- **Ctrl+C**: Copy selected card to clipboard
-- **Ctrl+X**: Cut selected card to clipboard  
-- **Ctrl+V**: Paste card at mouse cursor position
-- Cards are pasted without connections for clean network building
-
-## 🎨 Interface Overview
-
-The application features a sophisticated, modern interface:
-
-- **Header Bar**: Application title and branding
-- **Toolbar**: Primary action buttons with hover effects
-- **Main Canvas**: Infinite workspace with grid overlay and zoom capabilities
-- **Status Bar**: Real-time feedback, connection mode indicators, and zoom controls
-- **Context Menus**: Right-click interactions for connection creation
-
-## 🔧 Technical Details
-
-### Architecture
-
-The application follows a clean, modular architecture:
-
-- **main.py**: Application entry point and main window management
-- **src/models.py**: Data models (Person, TextboxCard, LegendCard)
-- **src/event_handlers.py**: Comprehensive event handling and user interactions
-- **src/canvas_helpers.py**: Canvas rendering, widget creation, and visual effects
-- **src/ui_setup.py**: UI initialization and styling
-- **src/data_management.py**: File I/O, project management, and persistence
-- **src/dialogs.py**: Modal dialogs for data entry and editing
-- **src/constants.py**: Color schemes and configuration constants
-- **src/utils.py**: Utility functions and helpers
-
-### Dependencies
-
-- **tkinter**: GUI framework (Python standard library)
-- **Pillow (PIL)**: Image processing and PNG export
-- **csv**: Data persistence (Python standard library)
-- **zipfile**: Project packaging (Python standard library)
-- **logging**: Comprehensive application logging (Python standard library)
-- **urllib**: Update checking functionality (Python standard library)
-
-### Data Format
-
-Projects are saved as ZIP files containing:
-
-**data.csv structure:**
-```csv
-ID,Name,DOB,Alias,Address,Phone,SSN,Email,X,Y,Color,Files
-1,John Doe,1990-01-01,Johnny,123 Main St,555-1234,123-45-6789,john@email.com,500,500,0,"photo.jpg;document.pdf"
-TEXTBOXES
-ID,Title,Content,X,Y,Color
-1,Meeting Notes,Important discussion points...,600,300,1
-LEGENDS  
-ID,Title,Color_Entries,X,Y
-1,Status Legend,"{""0"": ""Active"", ""1"": ""Inactive""}",700,100
-CONNECTIONS
-From_ID,To_ID,Label
-1,2,Best Friend
-```
-
-**File Structure:**
-```
-project.zip
-├── data.csv          # Network data
-└── files/            # Attached images
-    └── [supporting image files]
-```
-
-## ⌨️ Keyboard Shortcuts
-
-| Key Combination | Action |
-|-----------------|--------|
-| **Left Click** | Select and drag cards |
-| **Right Click** | Start/complete connections |
-| **Double Click** | Edit cards or connection labels |
-| **Escape** | Cancel connection mode or clear selection |
-| **Delete/Backspace** | Delete selected connection or card |
-| **C** | Cycle card colors (person/textbox cards) |
-| **Ctrl+C** | Copy selected card |
-| **Ctrl+X** | Cut selected card |
-| **Ctrl+V** | Paste card at cursor |
-| **Mouse Wheel** | Zoom in/out |
-| **Middle Mouse + Drag** | Pan canvas |
-
-## 🎯 Features in Detail
-
-### Card Management
-- **Three Card Types**: People, textboxes, and legends for comprehensive data organization
-- **Rich Data Models**: Extensive information storage with validation
-- **Visual Consistency**: Unified design language across all card types
-- **Smart Defaults**: Automatic positioning and sensible default values
-
-### Connection System
-- **Universal Connectivity**: Any card can connect to any other card
-- **Visual Connection Lines**: Clean, professional connection rendering
-- **Interactive Labels**: Clickable, editable connection descriptions
-- **Connection Management**: Easy creation, editing, and deletion
-
-### Visual Design
-- **Modern Aesthetics**: Card-based design with subtle shadows and rounded corners
-- **Color Psychology**: Carefully chosen color palette for readability and professionalism
-- **Responsive Interactions**: Smooth hover effects and visual feedback
-- **Typography**: Consistent use of Segoe UI for optimal readability
-
-### Zoom and Pan
-- **Smooth Scaling**: Proportional zoom with maintained aspect ratios
-- **Text Scaling**: Intelligent font scaling that preserves readability
-- **Image Scaling**: High-quality image resizing with caching
-- **Performance**: Optimized rendering for large networks
-
-### File Attachments
-- **Multiple Formats**: Support for images, documents, and various file types
-- **Visual Preview**: Image thumbnails directly in person cards
-- **File Management**: Automatic organization and cleanup
-- **Package Integrity**: Complete project packaging with all dependencies
-
-## ℹ️ Frequently Asked Questions
-
-**Q: How can I import data from Excel or CSV files?**
-A: You can import data by: (1) Extracting your .ZIP project file, editing the data.csv file, and inserting new rows above the CONNECTIONS section, or (2) Converting your data to the legacy CSV format (see /test_files/musicians.csv as an example) and loading it directly into COMRADE.
-
-**Q: What file formats are supported for attachments?**
-A: COMRADE supports common image formats (JPG, PNG, GIF, BMP, WebP) with thumbnail preview, and any document format for attachment. Images are automatically resized and displayed in person cards.
-
-**Q: How does the color-coding system work?**
-A: Each card type has a color-coding system. Person and textbox cards can cycle through different colors using the 'C' key, while legend cards are used to document what each color represents in your network.
-
-**Q: What's the performance like with large networks?**
-A: COMRADE is optimized for performance with features like image caching, debounced zoom updates, and efficient canvas rendering. It can handle substantial networks while maintaining smooth interactions. It isn't perfect, but it's pretty good.
-
-**Q: Is the data format future-proof?**
-A: Yes, COMRADE maintains backward compatibility with the legacy CSV format while using a modern ZIP-based project format. This ensures your data remains accessible across versions.
-
-## 📄 License
-
-This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE) file for details.
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit issues, feature requests, or pull requests to improve COMRADE. The modular architecture makes it easy to extend functionality and add new features.
+This project follows [STANDARDS.md](./STANDARDS.md).

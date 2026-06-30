@@ -1,9 +1,9 @@
 {
   "COMRADE": {
-    "version": "v0.7.5",
-    "released_at": "2025-07-24",
-    "original_filename": "COMRADE.v0.7.5.exe",
-    "release_file": "content/COMRADE/COMRADE.v0.7.5.exe",
+    "version": "v0.8.0",
+    "released_at": "2026-06-30",
+    "original_filename": "comrade-windows-x64.exe",
+    "release_file": "content/COMRADE/comrade-windows-x64.exe",
     "readme_file": "content/COMRADE/README.md"
   },
   "FENDER": {
