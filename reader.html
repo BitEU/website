@@ -19,6 +19,16 @@
             line-height: 1.8;
         }
 
+        /* Keep anchor targets clear of the fixed nav bar */
+        .markdown-content h1,
+        .markdown-content h2,
+        .markdown-content h3,
+        .markdown-content h4,
+        .markdown-content h5,
+        .markdown-content h6 {
+            scroll-margin-top: 100px;
+        }
+
         .markdown-content h1 {
             color: #4a9eff;
             font-size: 2.5rem;
@@ -224,8 +234,28 @@
             xhr.onload = function() {
                 if (xhr.status === 200 || xhr.status === 0) {
                     try {
+                        // marked no longer emits heading ids (removed in v16), so
+                        // in-page links like [Quick Start](#quick-start) had nothing
+                        // to point at. Slugify headings the same way GitHub does.
+                        const slugCounts = {};
+                        function slugify(text) {
+                            const base = text
+                                .toLowerCase()
+                                .trim()
+                                .replace(/<[^>]*>/g, '')      // strip any inline html
+                                .replace(/[^\w\s-]/g, '')      // drop punctuation/emoji
+                                .replace(/\s+/g, '-');
+                            const seen = slugCounts[base] || 0;
+                            slugCounts[base] = seen + 1;
+                            return seen === 0 ? base : `${base}-${seen}`;
+                        }
+
                         // The fix: Destructure the object in the function arguments { href, title, text }
                         const renderer = {
+                            heading({ tokens, depth }) {
+                                const text = this.parser.parseInline(tokens);
+                                return `<h${depth} id="${slugify(text)}">${text}</h${depth}>\n`;
+                            },
                             image({ href, title, text }) {
                                 let fullPath = href;
                                 
@@ -254,6 +284,16 @@
 
                         const html = marked.parse(xhr.responseText);
                         document.getElementById('content').innerHTML = html;
+
+                        // The document renders after the browser has already tried to
+                        // honour the URL hash, so deep links need a nudge once the
+                        // headings actually exist.
+                        if (window.location.hash) {
+                            const target = document.getElementById(
+                                decodeURIComponent(window.location.hash.slice(1))
+                            );
+                            if (target) target.scrollIntoView();
+                        }
                     } catch (error) {
                         console.error("Parsing Error:", error);
                         document.getElementById('content').innerHTML = 
