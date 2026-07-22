@@ -51,14 +51,13 @@ jobs:
           TOKEN: ${{ steps.app-token.outputs.token }}
           ORG: WCDAHT
         run: |
-          # Start building manifest entries
-          # We'll collect per-repo JSON and assemble at the end
           mkdir -p tmp_manifest
 
           for REPO in ${{ steps.repos.outputs.repos }}; do
+            echo "------------------------------------------"
             echo "Processing $REPO..."
 
-            # --- Fetch latest release ---
+            # --- 1. Fetch latest release ---
             RELEASE=$(curl -s \
               -H "Authorization: Bearer $TOKEN" \
               -H "Accept: application/vnd.github+json" \
@@ -81,7 +80,7 @@ jobs:
             rm -rf "content/$REPO"
             mkdir -p "content/$REPO"
 
-            # --- Download release asset with its original name ---
+            # --- 2. Download release asset ---
             echo "Downloading release asset: $ASSET_NAME"
             curl -sL \
               -H "Authorization: Bearer $TOKEN" \
@@ -89,10 +88,8 @@ jobs:
               -o "content/$REPO/$ASSET_NAME" \
               "$ASSET_URL"
 
-            # --- Download README ---
+            # --- 3. Download README ---
             echo "Downloading README for $REPO"
-            
-            # Try uppercase README.md first
             STATUS=$(curl -sL -w "%{http_code}" \
               -H "Authorization: Bearer $TOKEN" \
               -H "Accept: application/vnd.github.raw+json" \
@@ -112,18 +109,48 @@ jobs:
                 
               if [ "$STATUS_LOWER" -ne 200 ]; then
                 rm -f "content/$REPO/README.md"
-                echo "readme.md not found either (status $STATUS_LOWER)."
+                echo "::warning::README not found for $REPO (status $STATUS_LOWER)."
               fi
             fi
 
-            # Set manifest field value depending on whether a file was successfully saved
+            # --- 4. Download README_assets folder ---
+            # Path in source: /docs/README_assets/
+            # Path in dest: content/$REPO/README_assets/
+            ASSET_DIR_SOURCE="docs/README_assets"
+            ASSET_DIR_DEST="content/$REPO/docs/README_assets"
+            
+            echo "Checking for $ASSET_DIR_SOURCE..."
+            
+            # Request the contents of the directory via API
+            DIR_RESPONSE=$(curl -s \
+              -H "Authorization: Bearer $TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/$ORG/$REPO/contents/$ASSET_DIR_SOURCE")
+
+            # Check if the response is an array (indicating a directory)
+            if echo "$DIR_RESPONSE" | jq -e 'type == "array"' > /dev/null; then
+              echo "Found assets folder, downloading content..."
+              mkdir -p "$ASSET_DIR_DEST"
+              
+              # Extract download_url and name for every file in that folder
+              echo "$DIR_RESPONSE" | jq -c '.[] | select(.type == "file")' | while read -r item; do
+                F_NAME=$(echo "$item" | jq -r '.name')
+                F_URL=$(echo "$item" | jq -r '.download_url')
+                
+                curl -sL -H "Authorization: Bearer $TOKEN" -o "$ASSET_DIR_DEST/$F_NAME" "$F_URL"
+                echo "  -> Downloaded $F_NAME"
+              done
+            else
+              echo "::warning::Folder /$ASSET_DIR_SOURCE not found in $REPO. Images might be broken."
+            fi
+
+            # --- 5. Write per-repo manifest fragment ---
             if [ -f "content/$REPO/README.md" ]; then
               README_JSON_VAL="\"content/$REPO/README.md\""
             else
               README_JSON_VAL="null"
             fi
 
-            # --- Write per-repo manifest fragment ---
             cat > "tmp_manifest/$REPO.json" <<EOF
           {
             "version": "$VERSION",
