@@ -6,7 +6,10 @@
     <link rel="icon" type="image/x-icon" href="assets/logo.ico">
     <title>Documentation - BitEU</title>
     <link rel="stylesheet" href="styles.css">
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- Pinned. Note the unpinned URL was resolving to v15 (v16+ moved this file
+         to lib/marked.umd.js), so bumping the version also means changing the path. -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@15.0.12/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked-gfm-heading-id@4.1.4/lib/index.umd.js"></script>
     <style>
         .markdown-content {
             max-width: 900px;
@@ -234,28 +237,8 @@
             xhr.onload = function() {
                 if (xhr.status === 200 || xhr.status === 0) {
                     try {
-                        // marked no longer emits heading ids (removed in v16), so
-                        // in-page links like [Quick Start](#quick-start) had nothing
-                        // to point at. Slugify headings the same way GitHub does.
-                        const slugCounts = {};
-                        function slugify(text) {
-                            const base = text
-                                .toLowerCase()
-                                .trim()
-                                .replace(/<[^>]*>/g, '')      // strip any inline html
-                                .replace(/[^\w\s-]/g, '')      // drop punctuation/emoji
-                                .replace(/\s+/g, '-');
-                            const seen = slugCounts[base] || 0;
-                            slugCounts[base] = seen + 1;
-                            return seen === 0 ? base : `${base}-${seen}`;
-                        }
-
                         // The fix: Destructure the object in the function arguments { href, title, text }
                         const renderer = {
-                            heading({ tokens, depth }) {
-                                const text = this.parser.parseInline(tokens);
-                                return `<h${depth} id="${slugify(text)}">${text}</h${depth}>\n`;
-                            },
                             image({ href, title, text }) {
                                 let fullPath = href;
                                 
@@ -280,6 +263,12 @@
                             }
                         };
 
+                        // marked dropped heading ids in v8 (they aren't in the
+                        // CommonMark spec), so in-page links like
+                        // [Quick Start](#quick-start) had nothing to point at.
+                        // This extension restores them using GitHub's own slugger,
+                        // which is what the READMEs' tables of contents assume.
+                        marked.use(markedGfmHeadingId.gfmHeadingId());
                         marked.use({ renderer });
 
                         const html = marked.parse(xhr.responseText);
