@@ -163,6 +163,17 @@
             color: white;
             transform: translateY(-2px);
         }
+
+        /* Responsive Images */
+        .markdown-content img {
+            max-width: 100%;    /* Image will never be wider than the text container */
+            height: auto;       /* Maintains aspect ratio */
+            display: block;     /* Prevents small gaps at the bottom */
+            margin: 2rem auto;  /* Centers images and gives them breathing room */
+            border-radius: 8px; /* Matches your UI aesthetic */
+            border: 1px solid rgba(74, 158, 255, 0.2); /* Subtle blue border */
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3); /* Adds depth to screenshots */
+        }
     </style>
 </head>
 <body>
@@ -196,7 +207,7 @@
     </footer>
 
     <script>
-        // 1. Get the file parameter from URL (e.g., "content/Hashbrown/README.md")
+    // Get the file parameter from URL
         const urlParams = new URLSearchParams(window.location.search);
         const filePath = urlParams.get('file');
 
@@ -204,7 +215,7 @@
             document.getElementById('content').innerHTML = 
                 '<div class="error">No documentation file specified.</div>';
         } else {
-            // 2. Extract the base path (e.g., "content/Hashbrown/")
+            // Extract base path
             const lastSlashIndex = filePath.lastIndexOf('/');
             const basePath = lastSlashIndex !== -1 ? filePath.substring(0, lastSlashIndex + 1) : '';
 
@@ -213,36 +224,38 @@
             xhr.onload = function() {
                 if (xhr.status === 200 || xhr.status === 0) {
                     try {
-                        // 3. Create a custom renderer to handle relative image paths
+                        // The fix: Destructure the object in the function arguments { href, title, text }
                         const renderer = {
-                            image(href, title, text) {
+                            image({ href, title, text }) {
                                 let fullPath = href;
                                 
-                                // If path is relative (doesn't start with http, /, or data:)
-                                if (href && !href.startsWith('http') && !href.startsWith('/') && !href.startsWith('data:')) {
+                                // Ensure href exists and is a string before checking startsWith
+                                if (href && typeof href === 'string' && !href.startsWith('http') && !href.startsWith('/') && !href.startsWith('data:')) {
                                     fullPath = basePath + href;
                                 }
                                 
                                 return `<img src="${fullPath}" alt="${text || ''}" title="${title || ''}">`;
                             },
-                            // Also fix links to other .md files so they stay in the reader
-                            link(href, title, text) {
+                            link({ href, title, text }) {
                                 let fullPath = href;
-                                if (href && !href.startsWith('http') && !href.startsWith('/') && !href.startsWith('#')) {
-                                    fullPath = `reader.html?file=${basePath}${href}`;
+                                if (href && typeof href === 'string' && !href.startsWith('http') && !href.startsWith('/') && !href.startsWith('#')) {
+                                    // If the link is a local .md file, keep it in the reader
+                                    if (href.endsWith('.md')) {
+                                        fullPath = `reader.html?file=${basePath}${href}`;
+                                    } else {
+                                        fullPath = basePath + href;
+                                    }
                                 }
                                 return `<a href="${fullPath}" title="${title || ''}">${text}</a>`;
                             }
                         };
 
-                        // 4. Tell marked to use this renderer
                         marked.use({ renderer });
 
-                        // 5. Parse and display
                         const html = marked.parse(xhr.responseText);
                         document.getElementById('content').innerHTML = html;
                     } catch (error) {
-                        console.error(error);
+                        console.error("Parsing Error:", error);
                         document.getElementById('content').innerHTML = 
                             `<div class="error">Error parsing documentation: ${error.message}</div>`;
                     }
