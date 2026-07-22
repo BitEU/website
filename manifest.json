@@ -14,10 +14,10 @@
     "readme_file": "content/FENDER/README.md"
   },
   "Hashbrown": {
-    "version": "v0.1.5",
-    "released_at": "2026-05-26",
-    "original_filename": "Hashbrown.v0.1.5.7z",
-    "release_file": "content/Hashbrown/Hashbrown.v0.1.5.7z",
+    "version": "v0.2.0",
+    "released_at": "2026-07-22",
+    "original_filename": "HASHBROWN-windows-x64.exe",
+    "release_file": "content/Hashbrown/HASHBROWN-windows-x64.exe",
     "readme_file": "content/Hashbrown/README.md"
   },
   "Message-Maestro": {
