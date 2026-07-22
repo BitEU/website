@@ -196,7 +196,7 @@
     </footer>
 
     <script>
-        // Get the file parameter from URL
+        // 1. Get the file parameter from URL (e.g., "content/Hashbrown/README.md")
         const urlParams = new URLSearchParams(window.location.search);
         const filePath = urlParams.get('file');
 
@@ -204,16 +204,45 @@
             document.getElementById('content').innerHTML = 
                 '<div class="error">No documentation file specified.</div>';
         } else {
-            // Use XMLHttpRequest for better file:// protocol support
+            // 2. Extract the base path (e.g., "content/Hashbrown/")
+            const lastSlashIndex = filePath.lastIndexOf('/');
+            const basePath = lastSlashIndex !== -1 ? filePath.substring(0, lastSlashIndex + 1) : '';
+
             const xhr = new XMLHttpRequest();
             xhr.open('GET', filePath, true);
             xhr.onload = function() {
-                if (xhr.status === 200 || xhr.status === 0) { // 0 for local file://
+                if (xhr.status === 200 || xhr.status === 0) {
                     try {
-                        // Parse markdown to HTML using marked.js
+                        // 3. Create a custom renderer to handle relative image paths
+                        const renderer = {
+                            image(href, title, text) {
+                                let fullPath = href;
+                                
+                                // If path is relative (doesn't start with http, /, or data:)
+                                if (href && !href.startsWith('http') && !href.startsWith('/') && !href.startsWith('data:')) {
+                                    fullPath = basePath + href;
+                                }
+                                
+                                return `<img src="${fullPath}" alt="${text || ''}" title="${title || ''}">`;
+                            },
+                            // Also fix links to other .md files so they stay in the reader
+                            link(href, title, text) {
+                                let fullPath = href;
+                                if (href && !href.startsWith('http') && !href.startsWith('/') && !href.startsWith('#')) {
+                                    fullPath = `reader.html?file=${basePath}${href}`;
+                                }
+                                return `<a href="${fullPath}" title="${title || ''}">${text}</a>`;
+                            }
+                        };
+
+                        // 4. Tell marked to use this renderer
+                        marked.use({ renderer });
+
+                        // 5. Parse and display
                         const html = marked.parse(xhr.responseText);
                         document.getElementById('content').innerHTML = html;
                     } catch (error) {
+                        console.error(error);
                         document.getElementById('content').innerHTML = 
                             `<div class="error">Error parsing documentation: ${error.message}</div>`;
                     }
@@ -224,7 +253,7 @@
             };
             xhr.onerror = function() {
                 document.getElementById('content').innerHTML = 
-                    '<div class="error">Error loading documentation: NetworkError when attempting to fetch resource.</div>';
+                    '<div class="error">Error loading documentation: NetworkError.</div>';
             };
             xhr.send();
         }
