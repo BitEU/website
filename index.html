@@ -98,6 +98,17 @@
                         <a href="" class="btn-read">Read More</a>
                     </div>
                 </div>
+
+                <!-- Tool Box 6: NppListView -->
+                <div class="tool-card fade-in" data-repo-name="NppPlistView">
+                    <span class="tool-icon">📋</span>
+                    <h3>NppListView</h3>
+                    <p>A Notepad++ plugin for reading and modifying .plist and TSAF files found in Apple device extractions.</p>
+                    <div class="tool-buttons">
+                        <a href="#" class="btn-download" download><span class="version-tag">Loading...</span></a>
+                        <a href="" class="btn-read">Read More</a>
+                    </div>
+                </div>
             </div>
         </div>
     </section>
@@ -154,15 +165,28 @@
                             const releaseFilePath = manifestData[repoName]["release_file"];
                             const originalFileName = manifestData[repoName]["original_filename"];
                             const version = manifestData[repoName]["version"];
-                            
-                            // Update download link using Git LFS media URL
-                            downloadBtn.href = `https://media.githubusercontent.com/media/${repoOwner}/${websiteRepoName}/main/${releaseFilePath}`;
-                            downloadBtn.setAttribute('download', originalFileName);
+                            const readmeFile = manifestData[repoName]["readme_file"];
 
-                            readmeBtn.href = `reader.html?file=${manifestData[repoName]["readme_file"]}`;
-                            
-                            versionTag.textContent = version;
-                            
+                            // Read More is available whenever a README exists, even
+                            // before the first release is published.
+                            if (readmeFile) {
+                                readmeBtn.href = `reader.html?file=${readmeFile}`;
+                            }
+
+                            if (releaseFilePath) {
+                                // Update download link using Git LFS media URL
+                                downloadBtn.href = `https://media.githubusercontent.com/media/${repoOwner}/${websiteRepoName}/main/${releaseFilePath}`;
+                                downloadBtn.setAttribute('download', originalFileName);
+                                versionTag.textContent = version;
+                            } else {
+                                // No published release yet: keep the button visible
+                                // but inert rather than pointing at a 404.
+                                downloadBtn.removeAttribute('href');
+                                downloadBtn.style.opacity = '0.6';
+                                downloadBtn.style.cursor = 'default';
+                                versionTag.textContent = version || 'Coming soon';
+                            }
+
                         } catch (error) {
                             console.error(`Error loading files for ${repoName}:`, error);
                             versionTag.textContent = '(error loading)';

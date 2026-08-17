@@ -27,6 +27,13 @@
     "release_file": "content/Message-Maestro/message-maestro-windows-x64.exe",
     "readme_file": "content/Message-Maestro/README.md"
   },
+  "NppPlistView": {
+    "version": "Coming soon",
+    "released_at": null,
+    "original_filename": null,
+    "release_file": null,
+    "readme_file": "content/NppPlistView/README.md"
+  },
   "Toast": {
     "version": "v0.6.0",
     "released_at": "2026-01-06",
