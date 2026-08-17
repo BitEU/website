@@ -28,10 +28,10 @@
     "readme_file": "content/Message-Maestro/README.md"
   },
   "NppPlistView": {
-    "version": "Coming soon",
-    "released_at": null,
-    "original_filename": null,
-    "release_file": null,
+    "version": "v1.0.0",
+    "released_at": "2026-08-17",
+    "original_filename": "NppListView-v1.0.0.zip",
+    "release_file": "content/NppPlistView/NppListView-v1.0.0.zip",
     "readme_file": "content/NppPlistView/README.md"
   },
   "Toast": {
